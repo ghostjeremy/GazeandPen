@@ -1,92 +1,87 @@
-# PointDrawing.cs - Feature Overview
 
-This document outlines the features and functionality implemented in the `PointDrawing.cs` script. This Unity script handles both drawing and selection behaviors using a stylus input.
 
-## Modes
+## Features
 
-The system operates in two distinct modes:
-- **Drawing Mode** (default): Creates points when the user presses specific input buttons.
-- **Selection Mode**: Enables the user to select, deselect, and drag points.
+- **Geometry Creation:**  
+  Create and modify NURBS splines using control points. The splines are generated using complex mathematical algorithms and are visualized in real time.
 
-## Drawing Mode Features
+- **Point Creation:**  
+  Dynamically create individual points with adjustable properties, such as size and color.
 
-- **Point Creation**  
-  - In drawing mode, a red sphere is created at the stylus tip (inking position) when either:
-    - `cluster_front_value` is pressed.
-    - `tip_value` exceeds a defined threshold (`_tipForceThreshold`), indicating a strong pen touch.
-  - Created points are scaled (diameter = 0.01, corresponding to a radius of 0.005) and tagged as **"Point"** for future reference during selection.
+- **Input Strategies:**  
+  Utilize diverse input methods:
+  - **InkPenInputStrategy:** For digital pen devices.
+  - **QProControllerInputStrategy:** For VR controllers (e.g., Meta Quest Touch Controller Pro).
 
-## Selection Mode Features
+- **Selection and Movement:**  
+  Select objects using a visual selection sphere that dynamically adapts based on pressure input. Move selected objects via free movement or constrained (planar or vertical) mode.
 
-- **Dynamic Selection Range**  
-  The effective selection range is computed based on a base threshold and the current stylus pressure:
-  - **Base Threshold**: `_selectionDistanceThreshold` (e.g., 0.01).
-  - **Pressure Adjustment**:  
-    The effective range decreases when the stylus pressure (`cluster_middle_value`) is high and increases when the pressure is low.
-  - **Calculation Formula**:  
-    ```plaintext
-    effectiveRange = _selectionDistanceThreshold * (1 + (1 - cluster_middle_value) * _maxRangeMultiplier)
-    ```
-    - When `cluster_middle_value` = 1 (high pressure):  
-      `effectiveRange` equals `_selectionDistanceThreshold`.
-    - When `cluster_middle_value` = 0 (low pressure):  
-      `effectiveRange` equals `_selectionDistanceThreshold * (1 + _maxRangeMultiplier)`.
+- **Tool Management:**  
+  Switch between different tool modes (e.g., CreatePoint or CreateSpline) using the Tools Manager. This allows quick toggling between creating points and splines, with a simple UI integration.
 
-- **Visual Indicator**  
-  - A semi-transparent cyan sphere serves as a visual indicator for the current effective selection range.
-  - The indicator updates in real time to follow the pen tip's position and adjust in size accordingly.
-  - The displayed range uses a visual multiplier (`_selectionVisualMultiplier`), which is typically set so the visual range exactly matches the computed effective range.
+- **Task Switching:**  
+  Move between different project tasks or scenes using the HomePageController, which integrates with the overall GameManager and SceneLoader systems.
 
-- **Selection/Deselection Logic**  
-  - **Toggling**:  
-    - When pressing `cluster_front_value` in selection mode, an OverlapSphere is used to detect all nearby points (using the computed `effectiveRange` as the radius).
-    - If a point is already in the selection list, it is deselected (its color reverts to red).
-    - If a point is not selected, it is added to the selection (its color changes to yellow).
-  - **Color Coding**:
-    - **Within effective range**: Points are displayed in **green**.
-    - **Outside effective range**:
-      - Selected points are **yellow**.
-      - Unselected points remain **red**.
+## Project Structure
 
-- **Dragging**  
-  - A long press of `cluster_front_value` (beyond the threshold `_moveTriggerDuration`) initiates a drag operation.
-  - At the beginning of dragging, the script records the pen tip position and computes relative offsets for each selected object.
-  - As the pen moves, the selected objects are repositioned according to these relative offsets, maintaining their initial distance from the pen tip.
+- **Script/Geometry:**
+  - `NURBSSpline.cs` - Implements NURBS spline computation and visualization.
+  - `ControlPoint.cs` - Contains the definition for a control point that influences spline shape.
+  - `PointObject.cs` - Represents an individual, manipulatable point in the scene.
 
-- **Cancel Selection**  
-  - Pressing `cluster_back_value` clears all selections by resetting the color of selected objects to red and emptying the selection list.
+- **Script/Input/RightHand:**
+  - `IRightHandInputStrategy.cs` - Defines the interface for right-hand input strategies.
+  - `InkPenInputStrategy.cs` - Provides input handling for digital ink pens.
+  - `QProControllerInputStrategy.cs` - Handles VR controller input.
+  - `RightHandButton.cs` - Enumerates the available input buttons.
+  - `RightHandInputManager.cs` - Manages switching between different input strategies.
 
-## Input Handling
+- **Script/Managers:**
+  - `GeometryManager.cs` - Manages all geometric objects (splines and points) within the scene.
+  - `ToolsManager.cs` - Oversees the current tool state (e.g., creating points or splines) and provides methods to perform actions based on the selected tool.
 
-- **StylusHandler**  
-  The script relies on a `StylusHandler` component that provides current:
-  - `cluster_front_value`
-  - `tip_value`
-  - `cluster_back_value`
-  - `cluster_middle_value`  
-  These inputs determine actions such as drawing points, selecting/deselecting, and dragging.
+- **Script/Selection:**
+  - `SelectionManager.cs` - Controls the selection mechanism using a dynamic sphere, supporting multi-selection and hover state management.
+  - `MovementController.cs` - Facilitates movement (both free and constrained) of selected objects.
 
-## Mode Switching
+- **Script/Tasks:**
+  - `HomePageController.cs` - Provides functionality to switch between tasks/scenes, such as moving into a test task.
 
-- The mode is toggled via the public method `ToggleMode()`, which switches between drawing and selection modes.
-- When switching modes, relevant detection states are reset to prevent accidental triggers.
+- **Script/Core:**
+  - Contains essential systems like `GameManager`, `EventBus`, and `SceneLoader` for overarching project control.
 
-## Technical Details
+- **Script/Editors:**
+  - `ToolsManagerEditor.cs` - Custom editor script to aid in testing and debugging of tool actions in the Unity Inspector.
 
-- **Tagging**:  
-  Every created point is tagged as **"Point"** to facilitate efficient lookup during selection operations.
-  
-- **Material Handling**:  
-  New material instances are created when updating point colors to avoid modifying shared assets.
+## Getting Started
 
-- **Real-time Updates**:  
-  In every frame (`Update()`), the script recalculates:
-  - The effective selection range based on the current `cluster_middle_value`.
-  - The visual indicator's position and scale.
-  - The colors of all points depending on their distance from the pen tip and their selection status.
+1. **Prerequisites:**  
+   Ensure you have a Unity version compatible with the project requirements.
 
-## Summary
+2. **Project Setup:**  
+   - Import the project into the Unity Editor.
+   - Review the scenes and configure the initial input device via the Inspector (e.g., select between pen or controller).
 
-The `PointDrawing.cs` script provides a robust solution for both point creation (drawing) and point manipulation (selection/deselection and dragging) in VR/AR environments. The dynamic adjustment of the selection range through stylus pressure, coupled with clear visual feedback, creates an intuitive and responsive user experience.
+3. **Usage:**  
+   - Use the provided UI elements to select the desired tool (e.g., CreatePoint or CreateSpline).
+   - Interact with the scene using the corresponding input strategy.
+   - Utilize the selection sphere to hover and select objects; then use movement handlers to reposition them.
 
-*Feel free to adjust the serialized field values in the Unity Inspector to fine-tune the interactions (e.g., `_tipForceThreshold`, `_selectionDistanceThreshold`, `_maxRangeMultiplier`, and `_moveTriggerDuration`).* 
+## Build and Deployment
+
+- The project follows Unity's component-based architecture.  
+- Use Unity's Build Settings to target the desired platform (e.g., PC, VR devices).
+- Ensure all prefabs (e.g., `SelectionModel`, `PointModel`) are correctly placed under the **Resources** folder.
+
+## Additional Information
+
+- **Modular Design:**  
+  Each system (Geometry, Input, Selection, Tools, Tasks) is implemented in a modular way to facilitate easy maintenance and extensions.
+
+- **Best Practices:**  
+  The code adheres to Unity and C# best practices, such as the use of singletons for managers, component-based architecture for game logic, and clear separation of concerns.
+
+- **Customization:**  
+  Modify properties (such as `verticalMappingScale`, selection sphere radii, and movement constraints) via the Inspector to tailor the project's behavior to your needs.
+
+
