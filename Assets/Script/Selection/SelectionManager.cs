@@ -24,6 +24,28 @@ public class SelectionManager : MonoBehaviour
     // Indicates if selection mode is active; set via SetSelectionModeActive by InkPenInputStrategy
     public bool isSelectionModeActive = false;
 
+    private Vector3 tipOffset = new Vector3(0.00904f, -0.07088f, -0.07374f); 
+
+    // Helper function to determine pen tip position based on the current input mode.
+    private Vector3 GetPenTipPosition()
+    {
+        // Look up the RightHandInputManager to check which input mode is active
+        RightHandInputManager inputManager = FindObjectOfType<RightHandInputManager>();
+        if (inputManager != null && inputManager.UseQuest3AtStart)
+        {
+            VrStylusHandler vrStylus = FindObjectOfType<VrStylusHandler>();
+            if (vrStylus != null)
+                return vrStylus.CurrentState.inkingPose.position;
+        }
+        // Fallback: use controller's position.
+    // Get the local position and rotation of the right-hand controller
+    Vector3 controllerPos = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
+    Quaternion controllerRot = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch);
+    
+    // Calculate pen tip position: apply tipOffset to the controller's local coordinate system
+    return controllerPos + (controllerRot * tipOffset);
+    }
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -51,45 +73,34 @@ public class SelectionManager : MonoBehaviour
     {
         if (isSelectionModeActive)
         {
-            VrStylusHandler vrStylus = FindObjectOfType<VrStylusHandler>();
-            if (vrStylus != null)
+            Vector3 penTipPos = GetPenTipPosition();
+
+            // Update the visual selection sphere's position and scale (diameter = 2 * selectionSphereRadius)
+            if (selectionVisual != null)
             {
-                Vector3 penTipPos = vrStylus.CurrentState.inkingPose.position;
+                if (!selectionVisual.activeSelf)
+                    selectionVisual.SetActive(true);
+                selectionVisual.transform.position = penTipPos;
+                selectionVisual.transform.localScale = Vector3.one * (selectionSphereRadius * 2f);
+            }
 
-                // Update the visual selection sphere's position and scale (diameter = 2 * selectionSphereRadius)
-                if (selectionVisual != null)
-                {
-                    if (!selectionVisual.activeSelf)
-                        selectionVisual.SetActive(true);
-                    selectionVisual.transform.position = penTipPos;
-                    selectionVisual.transform.localScale = Vector3.one * (selectionSphereRadius * 2f);
-                }
+            // Update hover status based on the pen tip position
+            Collider[] colliders = Physics.OverlapSphere(penTipPos, selectionSphereRadius);
+            HashSet<ISelectable> hoveredSelectables = new HashSet<ISelectable>();
+            foreach (Collider col in colliders)
+            {
+                ISelectable selectable = col.GetComponentInParent<ISelectable>();
+                if (selectable != null)
+                    hoveredSelectables.Add(selectable);
+            }
 
-                // Update hover status: Get all objects within the selection sphere that implement the ISelectable interface
-                Collider[] colliders = Physics.OverlapSphere(penTipPos, selectionSphereRadius);
-                HashSet<ISelectable> hoveredSelectables = new HashSet<ISelectable>();
-                foreach (Collider col in colliders)
-                {
-                    ISelectable selectable = col.GetComponentInParent<ISelectable>();
-                    if (selectable != null)
-                        hoveredSelectables.Add(selectable);
-                }
-
-                // Update the hover state of all objects in the scene that implement ISelectable
-                // This is accomplished by finding all MonoBehaviour instances and then filtering for ISelectable instances
-                ISelectable[] allSelectables = FindObjectsOfType<MonoBehaviour>().OfType<ISelectable>().ToArray();
-                foreach (ISelectable selectable in allSelectables)
-                {
-                    // Trigger OnHoverEnter if within detection range; otherwise, trigger OnHoverExit
-                    if (hoveredSelectables.Contains(selectable))
-                    {
-                        selectable.OnHoverEnter();
-                    }
-                    else
-                    {
-                        selectable.OnHoverExit();
-                    }
-                }
+            ISelectable[] allSelectables = FindObjectsOfType<MonoBehaviour>().OfType<ISelectable>().ToArray();
+            foreach (ISelectable selectable in allSelectables)
+            {
+                if (hoveredSelectables.Contains(selectable))
+                    selectable.OnHoverEnter();
+                else
+                    selectable.OnHoverExit();
             }
         }
         else
@@ -111,14 +122,15 @@ public class SelectionManager : MonoBehaviour
     public void SetSelectionModeActive(bool active, Vector3 penTipPos, float pressure)
     {
         isSelectionModeActive = active;
+        // Override external penTipPos with the correct position based on the input mode.
+        penTipPos = GetPenTipPosition();
         if (active)
         {
             // Calculate the selection sphere radius based on pressure: within the range [0.1, 1], higher pressure yields a smaller radius
             float clampedPressure = Mathf.Clamp(pressure, 0.1f, 1.0f);
-            float normalized = (clampedPressure - 0.1f) / (1.0f - 0.1f); // Obtain a value in the range 0 to 1
+            float normalized = (clampedPressure - 0.1f) / (1.0f - 0.1f);
             float computedRadius = Mathf.Lerp(maxDynamicRadius, minDynamicRadius, normalized);
 
-            // Update the global selection sphere radius
             selectionSphereRadius = computedRadius;
 
             if (selectionVisual != null)
@@ -140,13 +152,9 @@ public class SelectionManager : MonoBehaviour
             foreach (ISelectable selectable in allSelectables)
             {
                 if (hoveredSelectables.Contains(selectable))
-                {
                     selectable.OnHoverEnter();
-                }
                 else
-                {
                     selectable.OnHoverExit();
-                }
             }
         }
         else

@@ -14,6 +14,29 @@ public class PointObject : MonoBehaviour, ISelectable
 
     private Renderer rend;
     private bool _isHovered = false;
+    private bool isDragging = false;
+    // New: Store the original transform.localScale
+    private Vector3 originalScale;
+
+    // New: Called when drag begins, applying highlight effect (e.g., enlargement)
+    public void OnDragEnter()
+    {
+        isDragging = true;
+        // For example: enlarge by 20% based on original scale
+        transform.localScale = originalScale * 1.2f;
+        // Can also enable Outline or glow effect here
+        // GetComponent<Outline>()?.SetActive(true);
+    }
+
+    // New: Called when drag ends to restore default state
+    public void OnDragExit()
+    {
+        isDragging = false;
+        // Restore to original scale
+        transform.localScale = originalScale;
+        // Disable Outline or glow effect
+        // GetComponent<Outline>()?.SetActive(false);
+    }
 
     // Dynamically load the PointModel prefab from the Resources folder using Resources.Load
     // Ensure that PointModel.prefab is placed in the Resources folder
@@ -26,6 +49,8 @@ public class PointObject : MonoBehaviour, ISelectable
         model.transform.localScale = Vector3.one * pointSize;
         rend = model.GetComponent<Renderer>();
         rend.material.color = normalColor;
+        // Store initial scale
+        originalScale = transform.localScale;
     }
 
     public void OnSelected()

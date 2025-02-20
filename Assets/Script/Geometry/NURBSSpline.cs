@@ -5,6 +5,8 @@ using UnityEngine;
 public class NURBSSpline : MonoBehaviour
 {
     public List<ControlPoint> controlPoints = new List<ControlPoint>();
+    // New: Flag indicating whether preview mode is active
+    public bool isPreviewMode = true;
     public int degree = 3; // The degree of the NURBS curve (typically 3, i.e., cubic)
     // New: Sampling resolution used to control the number of sample points on the curve; adjustable in the Inspector
     [SerializeField] private int resolution = 50;
@@ -19,6 +21,26 @@ public class NURBSSpline : MonoBehaviour
 
     // New: Stores the computed NURBS curve points
     private List<Vector3> splinePoints = new List<Vector3>();
+
+    private Vector3 tipOffset = new Vector3(0.00904f, -0.07088f, -0.07374f); 
+
+    // Helper function to determine pen tip position based on current input mode.
+    private Vector3 GetPenTipPosition()
+    {
+        RightHandInputManager inputManager = FindObjectOfType<RightHandInputManager>();
+        if (inputManager != null && inputManager.UseQuest3AtStart)
+        {
+            VrStylusHandler vrStylus = FindObjectOfType<VrStylusHandler>();
+            if (vrStylus != null)
+                return vrStylus.CurrentState.inkingPose.position;
+        }
+    // Get the local position and rotation of the right-hand controller
+    Vector3 controllerPos = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
+    Quaternion controllerRot = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch);
+    
+    // Calculate pen tip position: apply tipOffset to the controller's local coordinate system
+    return controllerPos + (controllerRot * tipOffset);
+    }
 
     private void Awake()
     {
@@ -39,8 +61,8 @@ public class NURBSSpline : MonoBehaviour
         controlPointsConnector.positionCount = 0;
         controlPointsConnector.material = new Material(Shader.Find("Sprites/Default"));
         // Set the dashed line color to be whiter and more transparent (using white with alpha 0.6)
-        controlPointsConnector.startColor = new Color(1f, 1f, 1f, 0.6f);
-        controlPointsConnector.endColor = new Color(1f, 1f, 1f, 0.6f);
+        controlPointsConnector.startColor = new Color(1f, 1f, 1f, 0.1f);
+        controlPointsConnector.endColor = new Color(1f, 1f, 1f, 0.1f);
         controlPointsConnector.widthMultiplier = 0.0025f;
         // Use Tile mode so the texture repeats to achieve a dashed effect
         controlPointsConnector.textureMode = LineTextureMode.Tile;
@@ -94,14 +116,10 @@ public class NURBSSpline : MonoBehaviour
         {
             effectiveCP.Add(cp.transform.position);
         }
-        // If preview is enabled, add the current pen tip position
-        if(includePreview)
+        // If preview mode is active, add pen tip position as a temporary control point for curve preview
+        if(includePreview && isPreviewMode)
         {
-            VrStylusHandler vrStylusHandler = FindObjectOfType<VrStylusHandler>();
-            if(vrStylusHandler != null)
-            {
-                effectiveCP.Add(vrStylusHandler.CurrentState.inkingPose.position);
-            }
+            effectiveCP.Add(GetPenTipPosition());
         }
 
         int nEffective = effectiveCP.Count;
@@ -195,20 +213,6 @@ public class NURBSSpline : MonoBehaviour
         foreach (var cp in controlPoints)
         {
             cpPositions.Add(cp.transform.position);
-        }
-        // If in preview mode and the pen tip position differs from the last control point, add the pen tip as an extra point
-        if (includePreview)
-        {
-            VrStylusHandler vrStylusHandler = FindObjectOfType<VrStylusHandler>();
-            if(vrStylusHandler != null)
-            {
-                Vector3 penTip = vrStylusHandler.CurrentState.inkingPose.position;
-                Vector3 lastCP = cpPositions[cpPositions.Count - 1];
-                if ((penTip - lastCP).sqrMagnitude > 1e-4)
-                {
-                    cpPositions.Add(penTip);
-                }
-            }
         }
 
         int count = cpPositions.Count;
@@ -347,11 +351,11 @@ public class NURBSSpline : MonoBehaviour
 
     void Update()
     {
-        // Recalculate the spline every frame to ensure the curve updates when control point positions change
-        CalculateSpline();
+        // Recalculate the spline every frame, using preview if enabled.
+        UpdateSpline();
     }
     
-    // Compute the NURBS curve based on cpPositions, degree, knots, and resolution
+    // Calculate NURBS curve based on cpPositions, degree, knots, and resolution
     // Preserve the original curve calculation logic unchanged
     void CalculateSpline()
     {
@@ -384,5 +388,13 @@ public class NURBSSpline : MonoBehaviour
             controlPointsConnector.positionCount = cpPosForConnector.Length;
             controlPointsConnector.SetPositions(cpPosForConnector);
         }
+    }
+
+    // New: Confirm curve creation and disable preview mode
+    public void ConfirmSpline()
+    {
+        isPreviewMode = false;
+        // Update curve without pen tip preview
+        UpdateSpline(false);
     }
 }

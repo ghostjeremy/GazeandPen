@@ -14,6 +14,29 @@ public class ControlPoint : MonoBehaviour, ISelectable
 
     private Renderer rend;
     private bool _isHovered = false;
+    // New: Indicates whether drag is active
+    private bool isDragging = false;
+    // New: Record the original transform.localScale
+    private Vector3 originalScale;
+
+    // New: Called when drag begins, applying a highlight effect (e.g., enlargement)
+    public void OnDragEnter()
+    {
+         isDragging = true;
+         // For example: enlarge by 20% based on the original scale
+         transform.localScale = originalScale * 1.2f;
+         // 或者启用 Outline 效果
+         // GetComponent<Outline>()?.SetActive(true);
+    }
+
+    // New: Called when drag ends to revert to the default state
+    public void OnDragExit()
+    {
+         isDragging = false;
+         transform.localScale = originalScale;
+         // Disable Outline effect
+         // GetComponent<Outline>()?.SetActive(false);
+    }
 
     // Dynamically load the ControlPointModel prefab from the Resources folder using Resources.Load
     // Ensure that ControlPointModel.prefab is placed in the Resources folder
@@ -26,6 +49,8 @@ public class ControlPoint : MonoBehaviour, ISelectable
         model.transform.localScale = Vector3.one * pointSize;
         rend = model.GetComponent<Renderer>();
         rend.material.color = normalColor;
+        // Store the initial scale
+        originalScale = transform.localScale;
     }
 
     public void OnSelected()

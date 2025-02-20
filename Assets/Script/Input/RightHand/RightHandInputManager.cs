@@ -7,6 +7,9 @@ public class RightHandInputManager : MonoBehaviour
     [SerializeField]
     private bool useQuest3AtStart = false; // Set initial input device in Inspector
 
+    // Expose the input mode for external checks
+    public bool UseQuest3AtStart => useQuest3AtStart;
+
     private void Start()
     {
         if (useQuest3AtStart)

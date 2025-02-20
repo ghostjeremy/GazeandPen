@@ -6,7 +6,7 @@ public class HomePageController : MonoBehaviour
     public void OnFreeTaskButtonClicked()
     {
         // Switch to the test task scene
-        GameManager.Instance.SwitchTask("TestTaskPassthrough");
+        GameManager.Instance.SwitchTask("TestTask");
     }
 }
 

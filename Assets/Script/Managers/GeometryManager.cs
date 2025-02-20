@@ -16,6 +16,26 @@ public class GeometryManager : MonoBehaviour
     // New: The currently active spline being created (if in spline mode)
     public NURBSSpline activeSpline = null;
 
+    private Vector3 tipOffset = new Vector3(0.00904f, -0.07088f, -0.07374f); 
+
+    // Helper function to determine pen tip position based on current input mode.
+    private Vector3 GetPenTipPosition()
+    {
+        RightHandInputManager inputManager = FindObjectOfType<RightHandInputManager>();
+        if (inputManager != null && inputManager.UseQuest3AtStart)
+        {
+            VrStylusHandler vrStylus = FindObjectOfType<VrStylusHandler>();
+            if (vrStylus != null)
+                return vrStylus.CurrentState.inkingPose.position;
+        }
+        // Get the local position and rotation of the right-hand controller
+        Vector3 controllerPos = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
+        Quaternion controllerRot = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch);
+        
+        // Calculate pen tip position: apply tipOffset to the controller's local coordinate system
+        return controllerPos + (controllerRot * tipOffset);
+    }
+
     private void Awake()
     {
         if (Instance == null)
@@ -41,12 +61,8 @@ public class GeometryManager : MonoBehaviour
         GameObject pointObj = new GameObject("Point");
         PointObject point = pointObj.AddComponent<PointObject>();
 
-        // Set the initial position to the pen tip position
-        var vrStylusHandler = FindObjectOfType<VrStylusHandler>();
-        if (vrStylusHandler != null)
-            pointObj.transform.position = vrStylusHandler.CurrentState.inkingPose.position;
-        else
-            pointObj.transform.position = Vector3.zero;
+        // Set the initial position to the pen tip position based on the input mode
+        pointObj.transform.position = GetPenTipPosition();
 
         // Add to the management list
         points.Add(point);
@@ -73,11 +89,7 @@ public class GeometryManager : MonoBehaviour
             GameObject cpObj = new GameObject("ControlPoint_" + activeSpline.controlPoints.Count);
             cpObj.transform.parent = activeSpline.transform;
             
-            var vrStylusHandler = FindObjectOfType<VrStylusHandler>();
-            if (vrStylusHandler != null)
-                cpObj.transform.position = vrStylusHandler.CurrentState.inkingPose.position;
-            else
-                cpObj.transform.position = Vector3.zero;
+            cpObj.transform.position = GetPenTipPosition();
             ControlPoint cp = cpObj.AddComponent<ControlPoint>();
             activeSpline.controlPoints.Add(cp);
             activeSpline.UpdateSpline();
@@ -90,8 +102,8 @@ public class GeometryManager : MonoBehaviour
     {
         if (activeSpline != null)
         {
-            // Update the final spline curve (without preview)
-            activeSpline.UpdateSpline(false);
+            // Confirm the spline: disable preview mode and update the final curve
+            activeSpline.ConfirmSpline();
             Debug.Log("Finished spline creation");
             activeSpline = null;
         }
